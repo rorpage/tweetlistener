@@ -3,8 +3,11 @@ from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler
 from tweepy import Stream
 
-from minio import Minio
-from minio.error import ResponseError
+from azure.storage.blob import BlockBlobService
+from azure.storage.blob import ContentSettings
+azure_blob_account = os.environ['azure_blob_account']
+azure_blob_account_key = os.environ['azure_blob_account_key']
+block_blob_service = BlockBlobService(account_name=azure_blob_account, account_key=azure_blob_account_key)
 
 @contextlib.contextmanager
 def nostdout():
@@ -16,11 +19,6 @@ def nostdout():
 auth = OAuthHandler(os.environ['consumer_key'], os.environ['consumer_secret'])
 auth.set_access_token(os.environ['access_token'], os.environ['access_token_secret'])
 
-minioClient = Minio(os.environ['minio_hostname'],
-                  access_key=os.environ['minio_access_key'],
-                  secret_key=os.environ['minio_secret_key'],
-                  secure=False)
-
 class TweetListener(StreamListener):
     def on_data(self, data):
         try:
@@ -28,7 +26,7 @@ class TweetListener(StreamListener):
             print('Got tweet from %s "%s" (%i followers)' % (tweet['user']['screen_name'], tweet['text'], tweet['user']['followers_count']))
             if not tweet['retweeted']:
                 if (tweet['extended_entities'] and tweet['extended_entities']['media']):
-                    print('Got %i media items' % len(tweet['extended_entities']['media']))
+                    print('Got %i media item(s)' % len(tweet['extended_entities']['media']))
                     for media in tweet['extended_entities']['media']:
                         if (media['type'] == 'photo'):
                             print("Ooooo a photo")
@@ -43,19 +41,14 @@ class TweetListener(StreamListener):
                                 f.write(image_data)
 
                             with nostdout():
-                                minioClient.fput_object('colorization', filename_in, file_path_in)
+                                block_blob_service.create_blob_from_path(
+                                    os.environ['azure_blob_container'],
+                                    filename_in,
+                                    file_path_in,
+                                    content_settings=ContentSettings(content_type='image/jpg')
+                                )
 
-                            headers = {'X-Callback-Url': 'http://gateway:8080/async-function/tweetpic'}
-                            json_data = {
-                                "image": filename_in,
-                                "output_filename": filename_out,
-                                "status_id": tweet['id_str']
-                            }
-                            r = requests.post('http://gateway:8080/async-function/colorization', json=json_data, headers=headers)
-                            if (r.status_code == requests.codes.accepted):
-                                print("Colorization succeeded for -> " + media['media_url_https'])
-                            else:
-                                print("Colorization failed for -> " + media['media_url_https'])
+                            print ("Blob upload succeeded for -> " + media['media_url_https'])
                         else:
                             print("Not a photo :(")
                 else:
@@ -74,5 +67,4 @@ if __name__ == '__main__':
     stream = Stream(auth, l)
 
     print('Listening for tweets')
-    #This line filter Twitter Streams to capture data by the keywords: 'python', 'javascript', 'ruby'
-    stream.filter(track=['@colorisebot'])
+    stream.filter(track=['@retromebot'])

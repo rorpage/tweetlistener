@@ -1,3 +1,3 @@
 #!/bin/sh
 
-docker build -t developius/tweetlistener .
+docker build -t rorpage/tweetlistener .
