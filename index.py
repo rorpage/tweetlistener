@@ -1,4 +1,4 @@
-import os, json, time, tempfile, sys, io, urllib, requests, contextlib
+import os, json, tempfile, sys, io, urllib, requests, contextlib
 from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler
 from tweepy import Stream
@@ -32,9 +32,7 @@ class TweetListener(StreamListener):
                             print("Ooooo a photo")
                             image_data = urllib.urlopen(media['media_url_https']).read()
 
-                            now = str(int(round(time.time() * 1000)))
-                            filename_in = now + '.jpg'
-                            filename_out = now + '_output.jpg'
+                            filename_in = tweet['id_str'] + '.jpg'
                             file_path_in = tempfile.gettempdir() + '/' + filename_in
 
                             with open(file_path_in, 'wb') as f:
